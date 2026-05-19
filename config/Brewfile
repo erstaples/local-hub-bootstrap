@@ -1,0 +1,16 @@
+# Formulae
+brew "git"
+brew "gh"
+brew "jq"
+brew "mas"          # App Store CLI, used to install Amphetamine
+brew "wget"
+brew "coreutils"
+brew "watch"
+brew "htop"
+brew "tmux"
+brew "tailscale"    # CLI; the menubar app comes from the cask below
+
+# Casks
+cask "tailscale-app"   # menubar app + GUI for Tailscale
+cask "ollama-app"      # menubar app; bundles the `ollama` CLI
+cask "raycast"         # convenient launcher for an always-on box

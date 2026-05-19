@@ -1,0 +1,11 @@
+# SSH host block for the DGX Spark, reachable over Tailscale.
+# Replace HostName with the Spark's MagicDNS name after joining the tailnet.
+
+Host spark
+    HostName spark.example.ts.net
+    User ubuntu
+    IdentityFile ~/.ssh/id_ed25519_spark
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 4
+    ForwardAgent no
