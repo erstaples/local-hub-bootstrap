@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Idempotent SSH tunnel from this Mac to the Spark's Ollama port.
+# Local 11435 -> spark:11434
+
+SPARK_HOST=spark
+LOCAL_PORT=11435
+REMOTE_PORT=11434
+
+cmd="${1:-status}"
+
+tunnel_pid() {
+  # Match the exact -L mapping so we don't pick up unrelated ssh sessions.
+  pgrep -f "ssh .* -L ${LOCAL_PORT}:127.0.0.1:${REMOTE_PORT} ${SPARK_HOST}" || true
+}
+
+case "$cmd" in
+  up)
+    if [[ -n "$(tunnel_pid)" ]]; then
+      echo "tunnel already up (pid $(tunnel_pid))"
+      exit 0
+    fi
+    if lsof -nP -iTCP:${LOCAL_PORT} -sTCP:LISTEN >/dev/null 2>&1; then
+      echo "port ${LOCAL_PORT} already in use by something else" >&2
+      exit 1
+    fi
+    ssh -fN \
+      -o ExitOnForwardFailure=yes \
+      -o ServerAliveInterval=30 \
+      -o ServerAliveCountMax=4 \
+      -L "${LOCAL_PORT}:127.0.0.1:${REMOTE_PORT}" \
+      "$SPARK_HOST"
+    echo "tunnel up: 127.0.0.1:${LOCAL_PORT} -> ${SPARK_HOST}:${REMOTE_PORT}"
+    ;;
+  down)
+    pid="$(tunnel_pid)"
+    if [[ -z "$pid" ]]; then
+      echo "no tunnel running"
+      exit 0
+    fi
+    kill "$pid"
+    echo "tunnel stopped (pid $pid)"
+    ;;
+  status)
+    pid="$(tunnel_pid)"
+    if [[ -n "$pid" ]]; then
+      echo "up (pid $pid)"
+    else
+      echo "down"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "usage: $(basename "$0") {up|down|status}" >&2
+    exit 2
+    ;;
+esac

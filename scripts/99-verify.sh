@@ -48,6 +48,36 @@ fi
 section "ssh / spark"
 [[ -f "$HOME/.ssh/id_ed25519_spark" ]] && ok "spark ssh key present" || fail "spark ssh key missing"
 [[ -f "$HOME/.ssh/config.d/spark" ]] && ok "spark ssh host stub present" || fail "spark ssh host stub missing"
+if ssh -o BatchMode=yes -o ConnectTimeout=3 spark true 2>/dev/null; then
+  ok "spark SSH reachable"
+else
+  fail "spark SSH not reachable (expected before first connect)"
+fi
+
+section "hub routing"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+[[ -x "$REPO_DIR/bin/hub-ollama" ]] && ok "hub-ollama present" || fail "hub-ollama missing"
+[[ -x "$REPO_DIR/bin/hub-tunnel" ]] && ok "hub-tunnel present"  || fail "hub-tunnel missing"
+[[ -f "$REPO_DIR/config/model-routes.conf" ]] && ok "model-routes.conf present" || fail "model-routes.conf missing"
+if "$REPO_DIR/bin/hub-tunnel" status >/dev/null 2>&1; then
+  ok "spark tunnel up on 11435"
+else
+  ok "spark tunnel down (bring up with: hub-tunnel up)"
+fi
+
+section "hermes presets"
+if command -v ollama >/dev/null && ollama list 2>/dev/null | awk '{print $1}' | grep -qx 'hermes-hub:8b'; then
+  ok "hermes-hub:8b built locally"
+else
+  fail "hermes-hub:8b not built (run scripts/09-hermes-config.sh)"
+fi
+if ssh -o BatchMode=yes -o ConnectTimeout=3 spark true 2>/dev/null; then
+  if ssh spark "ollama list 2>/dev/null | awk '{print \$1}' | grep -qx 'hermes-hub:70b'"; then
+    ok "hermes-hub:70b built on spark"
+  else
+    fail "hermes-hub:70b not built on spark (run scripts/09-hermes-config.sh)"
+  fi
+fi
 
 section "summary"
 if (( failures == 0 )); then

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper around `ollama` that picks the right endpoint based on the
+# model name and the routes in config/model-routes.conf.
+#
+# Examples:
+#   hub-ollama run hermes3:70b "hello"   # routed to the Spark via tunnel
+#   hub-ollama run hermes3:8b  "hello"   # local
+#   hub-ollama list                      # local
+#
+# Subcommands whose second positional arg is a model get inspected:
+#   run, pull, push, show, rm
+# Everything else routes to the local default.
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROUTES="$REPO_DIR/config/model-routes.conf"
+LOCAL_DEFAULT="http://127.0.0.1:11434"
+
+if ! command -v ollama >/dev/null 2>&1; then
+  echo "ollama not on PATH; install it first (scripts/06-ollama.sh)" >&2
+  exit 1
+fi
+
+resolve_endpoint() {
+  local model="$1"
+  [[ -f "$ROUTES" ]] || { echo "$LOCAL_DEFAULT"; return; }
+  local match
+  match="$(grep -E "^[[:space:]]*${model}=" "$ROUTES" | tail -1 | sed -E 's/^[^=]+=//')"
+  echo "${match:-$LOCAL_DEFAULT}"
+}
+
+ensure_tunnel_if_needed() {
+  local endpoint="$1"
+  case "$endpoint" in
+    *127.0.0.1:11435*|*localhost:11435*)
+      "$REPO_DIR/bin/hub-tunnel" status >/dev/null 2>&1 || "$REPO_DIR/bin/hub-tunnel" up
+      ;;
+  esac
+}
+
+sub="${1:-}"
+model=""
+case "$sub" in
+  run|pull|push|show|rm)
+    model="${2:-}"
+    ;;
+esac
+
+endpoint="$LOCAL_DEFAULT"
+if [[ -n "$model" ]]; then
+  endpoint="$(resolve_endpoint "$model")"
+  ensure_tunnel_if_needed "$endpoint"
+fi
+
+export OLLAMA_HOST="$endpoint"
+exec ollama "$@"

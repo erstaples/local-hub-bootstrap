@@ -1,0 +1,28 @@
+# hermes-hub:8b — Hermes 3 8B preset for the local Mac
+# Build with: ollama create hermes-hub:8b -f Modelfile.hub-8b
+
+FROM hermes3:8b
+
+# Hermes 3 supports tool/function calling with <tools>...</tools> and
+# <tool_call>...</tool_call> tags. The stop tokens below keep generation
+# clean when the model emits one of those structured blocks.
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "</tool_call>"
+PARAMETER stop "</tools>"
+
+# 16k context fits comfortably on a 48 GB Mac at 8B; tune up/down to taste.
+PARAMETER num_ctx 16384
+
+PARAMETER temperature 0.6
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.05
+
+SYSTEM """You are the local hub assistant on an always-on MacBook Pro,
+paired with a DGX Spark for heavy inference. Be concise. Prefer concrete
+answers and code over caveats. When a request needs more reasoning, more
+context, or larger models than fit locally, say so and suggest routing
+to the Spark.
+
+You can call tools when the user provides a <tools>...</tools> block.
+Emit calls as <tool_call>{"name": "...", "arguments": {...}}</tool_call>
+and wait for the result before answering the user."""
