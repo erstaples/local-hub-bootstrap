@@ -1,0 +1,21 @@
+# gpt-oss-hub:20b — OpenAI gpt-oss 20B preset for the local Mac.
+# Build with: ollama create gpt-oss-hub:20b -f Modelfile.gpt-oss-hub.20b
+
+FROM gpt-oss:20b
+
+# gpt-oss uses the Harmony chat template; tool-call markers and channel
+# tokens are handled by the template, so no custom stop tokens needed.
+
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.7
+PARAMETER top_p 0.95
+
+SYSTEM """You are the local hub assistant on an always-on MacBook Pro,
+paired with a DGX Spark for heavy inference. Be concise. Prefer concrete
+answers and code over caveats.
+
+Reasoning: medium
+
+When a request needs more capacity or longer reasoning than fits locally,
+say so and suggest routing to the Spark (hermes-hub:70b for agents,
+gpt-oss-hub:120b for hard reasoning)."""

@@ -10,10 +10,11 @@ inference, with the Mac acting as the always-reachable coordinator.
   user-facing keep-awake (handles lid-close).
 - **Tailscale** — mesh networking to reach the DGX Spark and other nodes
   from anywhere.
-- **Ollama + Hermes models** — Nous Research Hermes 3 (8B local, 70B
-  optionally routed to the Spark) plus `hermes-hub:*` presets built
-  from Modelfiles in `config/hermes/` (system prompt, tool-call stops,
-  longer context).
+- **Ollama + two model families** — OpenAI `gpt-oss` (20B local, 120B
+  on the Spark) as the daily-driver reasoner, plus Nous Research
+  `hermes4` (14B local, 70B on the Spark) as the steerable agent
+  fallback. `*-hub` presets are built from Modelfiles in `config/models/`
+  with tuned context, sampling, and a hub-flavored system prompt.
 - **Model routing** — `bin/hub-ollama` picks the right endpoint per
   model from `config/model-routes.conf`; `bin/hub-tunnel` brings up the
   SSH tunnel to the Spark on demand.
@@ -44,26 +45,30 @@ scripts/02-homebrew.sh             Homebrew + Brewfile + PATH
 scripts/03-power-settings.sh       pmset for always-on
 scripts/04-amphetamine.sh          Amphetamine via mas
 scripts/05-tailscale.sh            Tailscale install + up
-scripts/06-ollama.sh               Ollama + hermes3:8b pull
+scripts/06-ollama.sh               Ollama + pull gpt-oss:20b, hermes4:14b
 scripts/07-dgx-spark.sh            SSH config stub for the Spark
-scripts/08-ollama-spark.sh         install Ollama on Spark, pull hermes3:70b
-scripts/09-hermes-config.sh        build hermes-hub:{8b,70b} presets
+scripts/08-ollama-spark.sh         install Ollama on Spark, pull gpt-oss:120b, hermes4:70b
+scripts/09-model-presets.sh        build *-hub presets on the right host each
 scripts/99-verify.sh               verify every component
 bin/hub-ollama                     wrapper that routes by model
 bin/hub-tunnel                     up/down/status of the Spark SSH tunnel
 config/Brewfile                    formulae + casks
 config/ssh_config.spark            SSH host block for the Spark
 config/model-routes.conf           model -> endpoint map
-config/hermes/Modelfile.hub-8b     local Hermes preset
-config/hermes/Modelfile.hub-70b    Spark Hermes preset
+config/models/Modelfile.gpt-oss-hub.20b    local gpt-oss preset
+config/models/Modelfile.gpt-oss-hub.120b   Spark gpt-oss preset
+config/models/Modelfile.hermes-hub.14b     local Hermes 4 preset
+config/models/Modelfile.hermes-hub.70b     Spark Hermes 4 preset
 ```
 
 ## Routing models between Mac and Spark
 
 ```bash
-hub-ollama run hermes-hub:8b  "summarize this"   # local, snappy
-hub-ollama run hermes-hub:70b "deep analysis..." # Spark, via tunnel
-hub-tunnel status                                # up / down
+hub-ollama run gpt-oss-hub:20b   "summarize this"     # local default
+hub-ollama run hermes-hub:14b    "drive these tools"  # local agent
+hub-ollama run gpt-oss-hub:120b  "hard reasoning..."  # Spark, via tunnel
+hub-ollama run hermes-hub:70b    "long agent run..."  # Spark, via tunnel
+hub-tunnel status                                     # up / down
 ```
 
 The wrapper reads `config/model-routes.conf` and sets `OLLAMA_HOST` per

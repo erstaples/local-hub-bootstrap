@@ -65,18 +65,26 @@ else
   ok "spark tunnel down (bring up with: hub-tunnel up)"
 fi
 
-section "hermes presets"
-if command -v ollama >/dev/null && ollama list 2>/dev/null | awk '{print $1}' | grep -qx 'hermes-hub:8b'; then
-  ok "hermes-hub:8b built locally"
-else
-  fail "hermes-hub:8b not built (run scripts/09-hermes-config.sh)"
+section "model presets"
+if command -v ollama >/dev/null; then
+  local_models="$(ollama list 2>/dev/null | awk '{print $1}')"
+  for tag in gpt-oss-hub:20b hermes-hub:14b; do
+    if grep -qx "$tag" <<<"$local_models"; then
+      ok "$tag built locally"
+    else
+      fail "$tag not built locally (run scripts/09-model-presets.sh)"
+    fi
+  done
 fi
 if ssh -o BatchMode=yes -o ConnectTimeout=3 spark true 2>/dev/null; then
-  if ssh spark "ollama list 2>/dev/null | awk '{print \$1}' | grep -qx 'hermes-hub:70b'"; then
-    ok "hermes-hub:70b built on spark"
-  else
-    fail "hermes-hub:70b not built on spark (run scripts/09-hermes-config.sh)"
-  fi
+  spark_models="$(ssh spark 'ollama list 2>/dev/null | awk "{print \$1}"' || true)"
+  for tag in gpt-oss-hub:120b hermes-hub:70b; do
+    if grep -qx "$tag" <<<"$spark_models"; then
+      ok "$tag built on spark"
+    else
+      fail "$tag not built on spark (run scripts/09-model-presets.sh)"
+    fi
+  done
 fi
 
 section "summary"

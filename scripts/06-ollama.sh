@@ -3,11 +3,13 @@ set -euo pipefail
 
 log() { printf '\033[1;34m   ->\033[0m %s\n' "$*"; }
 
-# Default models. Hermes 3 8B fits comfortably in 48 GB unified memory and
-# leaves room for context and other workloads. Larger Hermes variants are
-# meant to run on the DGX Spark; see scripts/07-dgx-spark.sh.
+# Default local models on the Mac.
+#  - gpt-oss:20b      — daily-driver, ~13 GB MXFP4, snappy on M4 Max
+#  - hermes4:14b      — agentic fallback, ~9 GB Q4, strong tool-calling
+# Heavier siblings (gpt-oss:120b, hermes4:70b) live on the Spark.
 MODELS=(
-  "hermes3:8b"
+  "gpt-oss:20b"
+  "hermes4:14b"
 )
 
 if ! command -v ollama >/dev/null 2>&1; then
@@ -15,13 +17,12 @@ if ! command -v ollama >/dev/null 2>&1; then
   exit 1
 fi
 
-# Launch the menubar app so the server is running. The app starts the
-# daemon on localhost:11434.
+# Launch the menubar app so the server is running.
 if [[ -d /Applications/Ollama.app ]]; then
   open -ga Ollama || true
 fi
 
-# Wait briefly for the server to come up.
+# Wait for the API.
 for _ in {1..15}; do
   if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
     break
