@@ -9,8 +9,11 @@ brew "watch"
 brew "htop"
 brew "tmux"
 brew "tailscale"    # CLI; the menubar app comes from the cask below
+brew "autossh"      # resilient SSH tunnel to the Spark
+brew "pipx"         # isolated Python tool installs (used for litellm)
 
 # Casks
 cask "tailscale-app"   # menubar app + GUI for Tailscale
 cask "ollama-app"      # menubar app; bundles the `ollama` CLI
 cask "raycast"         # convenient launcher for an always-on box
+cask "docker-desktop"  # used by Open WebUI's compose stack

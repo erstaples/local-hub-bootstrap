@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Manages $HOME/.config/local-hub/env — the shared env file that holds
+# the LiteLLM master key plus any other hub secrets. Sourced by launchd
+# wrappers and (when added by 02-homebrew.sh) by ~/.zprofile.
+
+ENV_DIR="$HOME/.config/local-hub"
+ENV_FILE="$ENV_DIR/env"
+
+mkdir -p "$ENV_DIR"
+chmod 700 "$ENV_DIR"
+
+case "${1:-show}" in
+  init)
+    if [[ -f "$ENV_FILE" ]] && grep -q '^LITELLM_MASTER_KEY=' "$ENV_FILE"; then
+      echo "env already initialized at $ENV_FILE"
+      exit 0
+    fi
+    key="sk-hub-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 32)"
+    touch "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    if grep -q '^LITELLM_MASTER_KEY=' "$ENV_FILE" 2>/dev/null; then
+      :  # already set, leave it
+    else
+      printf 'export LITELLM_MASTER_KEY="%s"\n' "$key" >> "$ENV_FILE"
+    fi
+    echo "wrote $ENV_FILE"
+    ;;
+  path)
+    echo "$ENV_FILE"
+    ;;
+  show)
+    [[ -f "$ENV_FILE" ]] && cat "$ENV_FILE" || echo "(not initialized — run: hub-env init)"
+    ;;
+  *)
+    echo "usage: $(basename "$0") {init|path|show}" >&2
+    exit 2
+    ;;
+esac

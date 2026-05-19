@@ -16,8 +16,15 @@ inference, with the Mac acting as the always-reachable coordinator.
   fallback. `*-hub` presets are built from Modelfiles in `config/models/`
   with tuned context, sampling, and a hub-flavored system prompt.
 - **Model routing** — `bin/hub-ollama` picks the right endpoint per
-  model from `config/model-routes.conf`; `bin/hub-tunnel` brings up the
-  SSH tunnel to the Spark on demand.
+  model from `config/model-routes.conf`; `bin/hub-tunnel` controls the
+  launchd-managed `autossh` tunnel to the Spark.
+- **LiteLLM proxy** — OpenAI-compatible API on `http://127.0.0.1:4000`,
+  so Continue.dev, Aider, Cursor, the OpenAI SDK, and any other tool
+  with a "base URL" setting can talk to the hub. Managed by launchd so
+  it auto-starts at login.
+- **Open WebUI** — chat UI at `http://127.0.0.1:8080`, talks to LiteLLM
+  for unified routing and to Ollama directly as a fallback. Runs via
+  Docker Compose with `restart: unless-stopped`.
 - **Dev baseline** — Homebrew, git, gh, jq, mas, plus an SSH config stub
   for the Spark.
 
@@ -49,16 +56,37 @@ scripts/06-ollama.sh               Ollama + pull gpt-oss:20b, hermes4:14b
 scripts/07-dgx-spark.sh            SSH config stub for the Spark
 scripts/08-ollama-spark.sh         install Ollama on Spark, pull gpt-oss:120b, hermes4:70b
 scripts/09-model-presets.sh        build *-hub presets on the right host each
+scripts/10-litellm.sh              install LiteLLM proxy + launchd plists for it and the tunnel
+scripts/11-open-webui.sh           bring up the Open WebUI compose stack
 scripts/99-verify.sh               verify every component
 bin/hub-ollama                     wrapper that routes by model
-bin/hub-tunnel                     up/down/status of the Spark SSH tunnel
+bin/hub-tunnel                     control the launchd autossh tunnel
+bin/hub-env                        init/show the shared env file (master key, ...)
 config/Brewfile                    formulae + casks
 config/ssh_config.spark            SSH host block for the Spark
 config/model-routes.conf           model -> endpoint map
-config/models/Modelfile.gpt-oss-hub.20b    local gpt-oss preset
-config/models/Modelfile.gpt-oss-hub.120b   Spark gpt-oss preset
-config/models/Modelfile.hermes-hub.14b     local Hermes 4 preset
-config/models/Modelfile.hermes-hub.70b     Spark Hermes 4 preset
+config/litellm.yaml                LiteLLM proxy config
+config/open-webui/docker-compose.yml   Open WebUI compose stack
+config/launchd/*.plist.template    launchd templates (rendered to ~/Library/LaunchAgents)
+config/models/Modelfile.*          *-hub Modelfile presets
+```
+
+## Talking to the hub
+
+| What | Where |
+|---|---|
+| Chat UI | http://127.0.0.1:8080 (Open WebUI) |
+| OpenAI-compatible API | http://127.0.0.1:4000/v1 (LiteLLM) |
+| Native Ollama API | http://127.0.0.1:11434 (local) / 11435 (Spark tunnel) |
+
+Auth: `$LITELLM_MASTER_KEY` from `~/.config/local-hub/env` (auto-loaded
+from `~/.zprofile`). Example:
+
+```bash
+curl http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-oss-120b","messages":[{"role":"user","content":"hi"}]}'
 ```
 
 ## Routing models between Mac and Spark

@@ -1,55 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Idempotent SSH tunnel from this Mac to the Spark's Ollama port.
-# Local 11435 -> spark:11434
+# Controls the launchd-managed autossh tunnel from this Mac to the
+# Spark's Ollama port. The actual ssh/autossh process is started by
+# launchd from ~/Library/LaunchAgents/com.local-hub.tunnel.plist, which
+# is installed by scripts/10-litellm.sh.
+#
+# Subcommands:
+#   up      -- kickstart the launchd job (start if stopped)
+#   down    -- stop the job (without unloading)
+#   status  -- show launchd state + whether the local port is bound
 
-SPARK_HOST=spark
+LABEL=com.local-hub.tunnel
+DOMAIN="gui/$(id -u)"
 LOCAL_PORT=11435
-REMOTE_PORT=11434
 
 cmd="${1:-status}"
 
-tunnel_pid() {
-  # Match the exact -L mapping so we don't pick up unrelated ssh sessions.
-  pgrep -f "ssh .* -L ${LOCAL_PORT}:127.0.0.1:${REMOTE_PORT} ${SPARK_HOST}" || true
+ensure_loaded() {
+  if ! launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
+    echo "tunnel launchd job not installed. Run scripts/10-litellm.sh first." >&2
+    exit 1
+  fi
 }
 
 case "$cmd" in
   up)
-    if [[ -n "$(tunnel_pid)" ]]; then
-      echo "tunnel already up (pid $(tunnel_pid))"
-      exit 0
-    fi
-    if lsof -nP -iTCP:${LOCAL_PORT} -sTCP:LISTEN >/dev/null 2>&1; then
-      echo "port ${LOCAL_PORT} already in use by something else" >&2
-      exit 1
-    fi
-    ssh -fN \
-      -o ExitOnForwardFailure=yes \
-      -o ServerAliveInterval=30 \
-      -o ServerAliveCountMax=4 \
-      -L "${LOCAL_PORT}:127.0.0.1:${REMOTE_PORT}" \
-      "$SPARK_HOST"
-    echo "tunnel up: 127.0.0.1:${LOCAL_PORT} -> ${SPARK_HOST}:${REMOTE_PORT}"
+    ensure_loaded
+    launchctl kickstart -k "$DOMAIN/$LABEL"
+    echo "tunnel kicked: $DOMAIN/$LABEL"
     ;;
   down)
-    pid="$(tunnel_pid)"
-    if [[ -z "$pid" ]]; then
-      echo "no tunnel running"
-      exit 0
-    fi
-    kill "$pid"
-    echo "tunnel stopped (pid $pid)"
+    ensure_loaded
+    launchctl stop "$DOMAIN/$LABEL"
+    echo "tunnel stop signaled (launchd will not restart it until: hub-tunnel up)"
     ;;
   status)
-    pid="$(tunnel_pid)"
-    if [[ -n "$pid" ]]; then
-      echo "up (pid $pid)"
-    else
-      echo "down"
-      exit 1
-    fi
+    ensure_loaded
+    state="$(launchctl print "$DOMAIN/$LABEL" 2>/dev/null | awk -F'= ' '/^[[:space:]]+state/ {print $2; exit}')"
+    pid="$(launchctl print "$DOMAIN/$LABEL"  2>/dev/null | awk -F'= ' '/^[[:space:]]+pid/   {print $2; exit}')"
+    bound="no"
+    if lsof -nP -iTCP:${LOCAL_PORT} -sTCP:LISTEN >/dev/null 2>&1; then bound="yes"; fi
+    printf 'state=%s pid=%s port_%s_bound=%s\n' "${state:-?}" "${pid:-?}" "$LOCAL_PORT" "$bound"
+    [[ "$bound" == "yes" ]] || exit 1
     ;;
   *)
     echo "usage: $(basename "$0") {up|down|status}" >&2
