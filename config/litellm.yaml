@@ -1,0 +1,46 @@
+# LiteLLM proxy config. Exposes the hub's models as an OpenAI-compatible
+# API on http://127.0.0.1:4000, so any tool with a "custom base URL"
+# setting (Continue.dev, Aider, Cursor, the OpenAI SDK, ...) can talk to
+# the hub.
+
+model_list:
+  # --- Local on the Mac ---------------------------------------------------
+  - model_name: gpt-oss-20b
+    litellm_params:
+      model: ollama_chat/gpt-oss-hub:20b
+      api_base: http://127.0.0.1:11434
+
+  - model_name: hermes-14b
+    litellm_params:
+      model: ollama_chat/hermes-hub:14b
+      api_base: http://127.0.0.1:11434
+
+  # --- Spark via the autossh tunnel on :11435 -----------------------------
+  - model_name: gpt-oss-120b
+    litellm_params:
+      model: ollama_chat/gpt-oss-hub:120b
+      api_base: http://127.0.0.1:11435
+
+  - model_name: hermes-70b
+    litellm_params:
+      model: ollama_chat/hermes-hub:70b
+      api_base: http://127.0.0.1:11435
+
+  # --- Convenience aliases that pair "fast" / "heavy" by family -----------
+  - model_name: gpt-oss
+    litellm_params:
+      model: ollama_chat/gpt-oss-hub:20b
+      api_base: http://127.0.0.1:11434
+
+  - model_name: hermes
+    litellm_params:
+      model: ollama_chat/hermes-hub:14b
+      api_base: http://127.0.0.1:11434
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true     # silently drop unsupported OpenAI params
+  set_verbose: false
+  request_timeout: 600  # heavy 120B prompts can take a while

@@ -1,0 +1,27 @@
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      # Primary backend: LiteLLM, so model names and routing are unified.
+      - OPENAI_API_BASE_URL=http://host.docker.internal:4000/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY must be set}
+      # Secondary backend: raw Ollama, so the model picker can see local
+      # models that aren't exposed through LiteLLM (e.g. a freshly pulled
+      # model before model-routes.conf is updated).
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # Single-user local box; switch on if you ever expose this via
+      # Tailscale Serve / Funnel.
+      - WEBUI_AUTH=False
+      - DEFAULT_MODELS=gpt-oss-20b
+      - ENABLE_OLLAMA_API=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  open-webui-data:

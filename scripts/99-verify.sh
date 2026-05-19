@@ -65,6 +65,31 @@ else
   ok "spark tunnel down (bring up with: hub-tunnel up)"
 fi
 
+section "litellm proxy"
+domain="gui/$(id -u)"
+if launchctl print "$domain/com.local-hub.litellm" >/dev/null 2>&1; then
+  ok "com.local-hub.litellm launchd job loaded"
+else
+  fail "com.local-hub.litellm not installed (run scripts/10-litellm.sh)"
+fi
+if curl -fsS http://127.0.0.1:4000/health/liveliness >/dev/null 2>&1; then
+  ok "litellm responding on :4000"
+else
+  fail "litellm not responding on :4000 (check $HOME/Library/Logs/local-hub/litellm.log)"
+fi
+
+section "open webui"
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx open-webui; then
+  ok "open-webui container running"
+else
+  fail "open-webui container not running (run scripts/11-open-webui.sh)"
+fi
+if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+  ok "open-webui responding on :8080"
+else
+  fail "open-webui not responding on :8080"
+fi
+
 section "model presets"
 if command -v ollama >/dev/null; then
   local_models="$(ollama list 2>/dev/null | awk '{print $1}')"
