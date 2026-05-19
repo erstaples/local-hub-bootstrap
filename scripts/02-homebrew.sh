@@ -21,6 +21,12 @@ if ! grep -q 'brew shellenv' "$HOME/.zprofile" 2>/dev/null; then
   printf '\neval "$(/opt/homebrew/bin/brew shellenv)"\n' >> "$HOME/.zprofile"
 fi
 
+# Put this repo's bin/ on PATH so hub-ollama and hub-tunnel are available.
+if ! grep -q "local-hub-bootstrap/bin" "$HOME/.zprofile" 2>/dev/null; then
+  log "adding $REPO_DIR/bin to PATH via ~/.zprofile"
+  printf '\nexport PATH="%s/bin:$PATH"\n' "$REPO_DIR" >> "$HOME/.zprofile"
+fi
+
 log "brew at $(command -v brew)"
 log "running brew bundle from config/Brewfile"
 brew bundle --file="$REPO_DIR/config/Brewfile"
